@@ -40,22 +40,112 @@ const reasonLevelGuide = [
   "5: 条件・反論対応つき理由"
 ];
 
+let currentModelAnswer = null;
+
 const promptInput = document.getElementById("promptInput");
 const answerInput = document.getElementById("answerInput");
 const charCount = document.getElementById("charCount");
 const scoreButton = document.getElementById("scoreButton");
+const modelAnswerButton = document.getElementById("modelAnswerButton");
+const modelAnswerArea = document.getElementById("modelAnswerArea");
 const resultArea = document.getElementById("resultArea");
 
 answerInput.addEventListener("input", () => {
   charCount.textContent = `文字数: ${answerInput.value.trim().length}`;
 });
 
+modelAnswerButton.addEventListener("click", () => {
+  const promptText = promptInput.value.trim();
+  currentModelAnswer = generateModelAnswerMock(promptText);
+  renderModelAnswer(currentModelAnswer);
+});
+
 scoreButton.addEventListener("click", () => {
   const promptText = promptInput.value.trim();
   const answerText = answerInput.value.trim();
   const result = gradeEssayMock(promptText, answerText);
-  renderResult(result);
+
+  if (!currentModelAnswer) {
+    currentModelAnswer = generateModelAnswerMock(promptText);
+    renderModelAnswer(currentModelAnswer);
+  }
+
+  const comparison = compareWithModelAnswerMock(result, currentModelAnswer);
+  renderResult(result, comparison);
 });
+
+function generateModelAnswerMock(promptText) {
+  const promptKeyword = extractPromptKeyword(promptText);
+  const modelText = `私は、幸せとは「自分で選んだ行動に納得できる状態」だと考える。なぜなら、快楽の量だけでは一時的な満足にとどまり、長期的には空虚さが残るからだ。例えば、受験勉強で遊ぶ時間を減らす選択は苦しいが、目的に沿って努力したという感覚は自己評価を安定させる。一方で、努力を続けても結果が出ないなら不幸ではないかという反論がある。確かに結果は重要だが、他者との比較だけで幸福を測ると、達成しても不安が続く。したがって、幸せは「結果」だけでなく「選択への納得」がある場合に成立すると言える。`;
+
+  return {
+    scoreBenchmark: 80,
+    title: "AI模範解答（80点答案）",
+    label: "合格上位の現実的な答案",
+    text: modelText,
+    features: [
+      "設問語を自分の言葉で定義し、結論を先に示している。",
+      "理由→具体例→反論→条件つき再主張の順で論理を構成している。",
+      "字数制限下で実行可能な密度に抑え、満点狙いの過剰情報を避けている。",
+      `問題文キーワード（${promptKeyword}）への接続を明示している。`
+    ]
+  };
+}
+
+function compareWithModelAnswerMock(studentResult, modelAnswer) {
+  const scoreDiff = studentResult.totalScore - modelAnswer.scoreBenchmark;
+  const sign = scoreDiff > 0 ? "+" : "";
+
+  const weaker = [];
+  if (studentResult.categoryScores.reasonPersuasiveness < 18) weaker.push("理由の具体性と因果の接続が弱く、主張の押し出しが不足しています。");
+  if (studentResult.categoryScores.counterargument < 4) weaker.push("反論処理・条件設定が薄く、議論の耐久力で差があります。");
+  if (studentResult.categoryScores.evidence < 12) weaker.push("具体例や根拠の解像度が低く、説得力の伸びしろがあります。");
+  if (!weaker.length) weaker.push("大きな弱点は少ないですが、段落ごとの論点接続をさらに明示すると安定します。");
+
+  const stronger = [];
+  if (studentResult.categoryScores.language >= 9) stronger.push("語彙と文の滑らかさは模範解答より自然です。");
+  if (studentResult.categoryScores.claimClarity >= 9) stronger.push("結論提示が明快で、立場が早く伝わります。");
+  if (studentResult.categoryScores.questionFit >= 18) stronger.push("設問への忠実度は模範解答と同等以上です。");
+  if (!stronger.length) stronger.push("主張の個性が出せる余地があり、改善次第で模範解答を超えられます。");
+
+  const improvements = [
+    "冒頭で定義→主張を1文で接続し、論点の軸を固定する。",
+    "理由ごとに『なぜなら→結果として』の因果チェーンを明示する。",
+    "反論に対して『ただし〜の場合』を追加し、条件付きで結論を補強する。"
+  ];
+
+  return {
+    benchmarkText: `AI模範解答は80点答案（合格上位の現実的な答案）です。あなたの答案は${studentResult.totalScore}点で、差は${sign}${scoreDiff}点です。`,
+    scoreDiff,
+    weaker,
+    stronger,
+    improvements
+  };
+}
+
+function extractPromptKeyword(promptText) {
+  const normalized = promptText.replace(/\s+/g, " ");
+  const hit = normalized.match(/「([^」]{2,20})」/);
+  if (hit) return hit[1];
+  const words = normalized
+    .replace(/[^ぁ-んァ-ヶ一-龠a-zA-Z0-9\s]/g, " ")
+    .split(/\s+/)
+    .filter((w) => w.length >= 2);
+  return words[0] || "設問テーマ";
+}
+
+function renderModelAnswer(modelAnswer) {
+  modelAnswerArea.innerHTML = `
+    <article class="model-answer-card">
+      <h3>${escapeHtml(modelAnswer.title)}</h3>
+      <p><span class="badge model">${escapeHtml(modelAnswer.label)}</span></p>
+      <p class="model-answer-meta">※ この解答は満点答案ではありません。80点答案として設計した比較基準です。</p>
+      <p>${escapeHtml(modelAnswer.text)}</p>
+      <h4>この模範解答の特徴</h4>
+      <ul>${modelAnswer.features.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}</ul>
+    </article>
+  `;
+}
 
 function gradeEssayMock(prompt, answer) {
   if (!answer) {
@@ -252,7 +342,7 @@ function buildRewriteExample(answer) {
     "ただし、最初は週3回から始める条件にすれば、無理なく継続しやすい。";
 }
 
-function renderResult(result) {
+function renderResult(result, comparison) {
   const categoryHtml = Object.entries(rubricConfig.categories)
     .map(([key, info]) => `<li>${info.label}: <strong>${result.categoryScores[key]} / ${info.max}</strong></li>`)
     .join("");
@@ -272,6 +362,27 @@ function renderResult(result) {
     <article class="result-card">
       <h3>観点別点数</h3>
       <ul>${categoryHtml}</ul>
+    </article>
+
+    <article class="result-card">
+      <h3>AI模範解答との差</h3>
+      <p>${escapeHtml(comparison.benchmarkText)}</p>
+      <p>差分: <strong>${comparison.scoreDiff > 0 ? "+" : ""}${comparison.scoreDiff}点</strong></p>
+    </article>
+
+    <article class="result-card">
+      <h3>模範解答より劣る点</h3>
+      <ul>${comparison.weaker.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
+    </article>
+
+    <article class="result-card">
+      <h3>模範解答より優れている点</h3>
+      <ul>${comparison.stronger.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
+    </article>
+
+    <article class="result-card">
+      <h3>模範解答に近づけるための改善案</h3>
+      <ul>${comparison.improvements.map((p) => `<li>${escapeHtml(p)}</li>`).join("")}</ul>
     </article>
 
     <article class="result-card">
