@@ -63,21 +63,22 @@ modelAnswerButton.addEventListener("click", () => {
 scoreButton.addEventListener("click", () => {
   const promptText = promptInput.value.trim();
   const answerText = answerInput.value.trim();
-  const result = gradeEssayMock(promptText, answerText);
-
   if (!currentModelAnswer) {
     currentModelAnswer = generateModelAnswerMock(promptText);
     renderModelAnswer(currentModelAnswer);
   }
 
-  const comparison = compareWithModelAnswerMock(result, currentModelAnswer);
+  const isExactModelMatch = isExactMatchModelAnswer(answerText, currentModelAnswer.text);
+  const result = gradeEssayMock(promptText, answerText, {
+    forceScore: isExactModelMatch ? 80 : null
+  });
+  const comparison = compareWithModelAnswerMock(result, currentModelAnswer, { isExactModelMatch });
   renderResult(result, comparison);
 });
 
 function generateModelAnswerMock(promptText) {
   const promptKeyword = extractPromptKeyword(promptText);
-  const baseText = `私は、幸せとは「自分で選んだ行動に納得できる状態」だと考える。なぜなら、快楽の量だけでは一時的な満足にとどまり、長期的には空虚さが残るからだ。例えば、受験勉強で遊ぶ時間を減らす選択は苦しいが、目的に沿って努力したという感覚は自己評価を安定させる。一方で、努力を続けても結果が出ないなら不幸ではないかという反論がある。確かに結果は重要だが、他者との比較だけで幸福を測ると、達成しても不安が続く。したがって、幸せは「結果」だけでなく「選択への納得」がある場合に成立すると言える。`;
-  const modelText = buildLengthAwareModelAnswer(baseText, promptText);
+  const modelText = buildStructuredModelAnswer(promptText);
 
   return {
     scoreBenchmark: 80,
@@ -93,7 +94,17 @@ function generateModelAnswerMock(promptText) {
   };
 }
 
-function compareWithModelAnswerMock(studentResult, modelAnswer) {
+function compareWithModelAnswerMock(studentResult, modelAnswer, opts = {}) {
+  if (opts.isExactModelMatch) {
+    return {
+      benchmarkText: "AI模範解答と完全一致のため、特別判定を適用しています。",
+      scoreDiff: 0,
+      weaker: [],
+      stronger: [],
+      improvements: []
+    };
+  }
+
   const scoreDiff = studentResult.totalScore - modelAnswer.scoreBenchmark;
   const sign = scoreDiff > 0 ? "+" : "";
 
@@ -142,7 +153,7 @@ function renderModelAnswer(modelAnswer) {
       <p><span class="badge model">${escapeHtml(modelAnswer.label)}</span></p>
       <p class="model-answer-meta">※ この解答は満点答案ではありません。80点答案として設計した比較基準です。</p>
       <p class="model-answer-meta">文字数: ${modelAnswer.text.length}字</p>
-      <p>${escapeHtml(modelAnswer.text)}</p>
+      <pre class="model-answer-structured">${escapeHtml(modelAnswer.text)}</pre>
       <h4>この模範解答の特徴</h4>
       <ul>${modelAnswer.features.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}</ul>
     </article>
@@ -164,6 +175,27 @@ function buildLengthAwareModelAnswer(baseText, promptText) {
 
   const minLength = Math.ceil(limit * 0.93);
   return fitTextWithinRange(baseText, minLength, limit);
+}
+
+function buildStructuredModelAnswer(promptText) {
+  const claim = "私は、幸せとは「自分で選んだ行動に納得できる状態」だと考える。";
+  const sections = [
+    `【主張】${claim}`,
+    "【理由1】快楽は短期的に強くても持続しにくく、納得を伴う選択は自己評価を安定させるからだ。例えば、試験前に遊びを減らして勉強を優先すると、その日の満足は減っても「目的に沿って動けた」という感覚が残り、翌日も行動を続けやすくなる。",
+    "【理由2】納得できる選択は、失敗したときの修正可能性を高めるからだ。例えば、目標と手段を言語化して学習計画を立てた人は、点数が下がっても原因を特定し、次回の対策を具体化できるため、挫折しにくい。",
+    "【理由3】他者比較だけに依存しない基準を持てるからだ。例えば、同じ順位でも「自分の優先順位に沿って努力した」と判断できれば、周囲の評価に振り回されず、心理的な安定を保ちやすい。",
+    "【反論と再反論】一方で、結果が出なければ幸福とは言えないという反論がある。確かに結果は重要だが、結果のみで幸福を測ると達成後も不安が残る。むしろ、結果評価に加えて選択への納得を基準に含める方が、長期的で再現可能な幸福につながる。",
+    `【結論】${claim}`
+  ];
+  const baseText = sections.join("\n");
+  return enforceConclusionEnding(buildLengthAwareModelAnswer(baseText, promptText), claim);
+}
+
+function enforceConclusionEnding(text, claim) {
+  const trimmed = (text || "").trim();
+  if (!trimmed) return `【主張】${claim}\n【結論】${claim}`;
+  if (trimmed.endsWith(`【結論】${claim}`)) return trimmed;
+  return `${trimmed}\n【結論】${claim}`;
 }
 
 function fitTextWithinRange(baseText, minLength, maxLength) {
@@ -202,7 +234,7 @@ function fitTextWithinRange(baseText, minLength, maxLength) {
   return text;
 }
 
-function gradeEssayMock(prompt, answer) {
+function gradeEssayMock(prompt, answer, opts = {}) {
   if (!answer) {
     return {
       totalScore: 0,
@@ -267,6 +299,7 @@ function gradeEssayMock(prompt, answer) {
 
   normalizeScores(categoryScores);
 
+  const isWhatQuestion = isDefinitionQuestion(prompt);
   const deductions = detectDeductions({
     prompt,
     answer,
@@ -277,14 +310,17 @@ function gradeEssayMock(prompt, answer) {
     hasExample,
     hasCounter,
     hasCondition,
+    hasDefinition,
+    isWhatQuestion,
     length
   });
 
   const goodPoints = buildGoodPoints({ hasClaim, hasReason, hasExample, hasCounter, hasCondition, hasCauseEffect, abstractTheme, hasDefinition });
   const suggestions = buildSuggestions(deductions);
-  const rewriteExample = buildRewriteExample(answer);
+  const rewriteExample = buildRewriteExample(prompt, answer);
 
-  const totalScore = Object.values(categoryScores).reduce((sum, n) => sum + n, 0);
+  let totalScore = Object.values(categoryScores).reduce((sum, n) => sum + n, 0);
+  if (opts.forceScore === 80) totalScore = 80;
   return {
     totalScore,
     passed: totalScore >= rubricConfig.passLine,
@@ -332,7 +368,7 @@ function detectDeductions(ctx) {
   if (/なんか|やばい/.test(ctx.answer)) list.push("日本語が不自然");
 
   const fitWeak = ctx.prompt && !containsPromptKeyword(ctx.prompt, ctx.answer);
-  if (fitWeak) list.push("問いに答えていない");
+  if (fitWeak && !(ctx.isWhatQuestion && ctx.hasDefinition)) list.push("問いに答えていない");
 
   return uniqueAndFiltered(list);
 }
@@ -346,6 +382,10 @@ function containsPromptKeyword(prompt, answer) {
 
   if (!promptKeywords.length) return true;
   return promptKeywords.some((w) => answer.includes(w));
+}
+
+function isDefinitionQuestion(promptText) {
+  return /とは何か|って何か|何を意味/.test(promptText || "");
 }
 
 function uniqueAndFiltered(items) {
@@ -390,11 +430,28 @@ function buildSuggestions(deductions) {
   return suggestions;
 }
 
-function buildRewriteExample(answer) {
-  const baseClaim = /私は/.test(answer) ? "私は、結論としてこの立場を支持する。" : "私は、この問題について賛成の立場を取る。";
-  return `${baseClaim}なぜなら、短時間で行動できる仕組みを作ると、学習の継続率が上がるからだ。例えば、毎日20分の振り返り時間を先に確保すると、理解不足をその日のうちに修正できる。` +
-    "一方で、時間管理が苦手な人には負担になるという反論もある。" +
-    "ただし、最初は週3回から始める条件にすれば、無理なく継続しやすい。";
+function buildRewriteExample(promptText, answer) {
+  const claim = /私は/.test(answer)
+    ? "私は、結論として『選択への納得を伴う生き方』を重視すべきだと考える。"
+    : "私は、結論として『選択への納得を伴う生き方』を重視すべきだと考える。";
+
+  const parts = [
+    `【主張】${claim}`,
+    "【理由1】納得して選んだ行動は、短期的な苦痛があっても継続しやすい。例えば、目標を明確にして毎日30分だけ復習すると、勉強時間は短くても理解の抜けを減らせる。",
+    "【理由2】納得のある選択は、失敗後の修正を可能にする。例えば、計画の根拠を記録しておけば、テスト結果が悪くても方法を調整でき、自己否定に流れにくい。",
+    "【理由3】他者評価だけに依存しないため、成果が遅れても心理的安定を維持できる。例えば、順位が同じでも『自分の優先順位に沿って行動したか』で振り返れば、次の一歩を具体化できる。",
+    "【反論と再反論】もちろん、結果が出なければ意味がないという反論は成り立つ。しかし、結果だけを基準にすると達成後も不安が残る。結果評価に加えて選択への納得を基準に含める方が、長期的には成果と幸福の両立につながる。",
+    `【結論】${claim}`
+  ];
+
+  const composed = parts.join("\n");
+  const limit = parseCharacterLimit(promptText);
+  if (!limit) return composed;
+  return enforceConclusionEnding(fitTextWithinRange(composed, Math.ceil(limit * 0.9), limit), claim);
+}
+
+function isExactMatchModelAnswer(answerText, modelText) {
+  return (answerText || "").trim() === (modelText || "").trim();
 }
 
 function renderResult(result, comparison) {
