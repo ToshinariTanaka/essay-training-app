@@ -76,7 +76,8 @@ scoreButton.addEventListener("click", () => {
 
 function generateModelAnswerMock(promptText) {
   const promptKeyword = extractPromptKeyword(promptText);
-  const modelText = `私は、幸せとは「自分で選んだ行動に納得できる状態」だと考える。なぜなら、快楽の量だけでは一時的な満足にとどまり、長期的には空虚さが残るからだ。例えば、受験勉強で遊ぶ時間を減らす選択は苦しいが、目的に沿って努力したという感覚は自己評価を安定させる。一方で、努力を続けても結果が出ないなら不幸ではないかという反論がある。確かに結果は重要だが、他者との比較だけで幸福を測ると、達成しても不安が続く。したがって、幸せは「結果」だけでなく「選択への納得」がある場合に成立すると言える。`;
+  const baseText = `私は、幸せとは「自分で選んだ行動に納得できる状態」だと考える。なぜなら、快楽の量だけでは一時的な満足にとどまり、長期的には空虚さが残るからだ。例えば、受験勉強で遊ぶ時間を減らす選択は苦しいが、目的に沿って努力したという感覚は自己評価を安定させる。一方で、努力を続けても結果が出ないなら不幸ではないかという反論がある。確かに結果は重要だが、他者との比較だけで幸福を測ると、達成しても不安が続く。したがって、幸せは「結果」だけでなく「選択への納得」がある場合に成立すると言える。`;
+  const modelText = buildLengthAwareModelAnswer(baseText, promptText);
 
   return {
     scoreBenchmark: 80,
@@ -140,11 +141,65 @@ function renderModelAnswer(modelAnswer) {
       <h3>${escapeHtml(modelAnswer.title)}</h3>
       <p><span class="badge model">${escapeHtml(modelAnswer.label)}</span></p>
       <p class="model-answer-meta">※ この解答は満点答案ではありません。80点答案として設計した比較基準です。</p>
+      <p class="model-answer-meta">文字数: ${modelAnswer.text.length}字</p>
       <p>${escapeHtml(modelAnswer.text)}</p>
       <h4>この模範解答の特徴</h4>
       <ul>${modelAnswer.features.map((f) => `<li>${escapeHtml(f)}</li>`).join("")}</ul>
     </article>
   `;
+}
+
+function parseCharacterLimit(promptText) {
+  if (!promptText) return null;
+  const normalized = promptText.replace(/[０-９]/g, (ch) => String.fromCharCode(ch.charCodeAt(0) - 0xFEE0));
+  const hit = normalized.match(/(\d{2,5})\s*(?:字|文字)\s*以内/);
+  if (!hit) return null;
+  const limit = Number.parseInt(hit[1], 10);
+  return Number.isFinite(limit) && limit > 0 ? limit : null;
+}
+
+function buildLengthAwareModelAnswer(baseText, promptText) {
+  const limit = parseCharacterLimit(promptText);
+  if (!limit) return baseText;
+
+  const minLength = Math.ceil(limit * 0.93);
+  return fitTextWithinRange(baseText, minLength, limit);
+}
+
+function fitTextWithinRange(baseText, minLength, maxLength) {
+  let text = (baseText || "").trim();
+  if (!text) return text;
+
+  if (text.length > maxLength) {
+    text = text.slice(0, maxLength).replace(/[、,;:\s]+$/g, "");
+    if (!/[。！？]$/.test(text)) text += "。";
+    return text;
+  }
+
+  const extensionPool = [
+    "また、幸福は感情の高まりだけで決まるのではなく、自分の選択に理由を与えられるかどうかで安定性が変わる。",
+    "たとえ短期的な失敗があっても、選択の根拠を言語化できる人は次の行動を修正しやすく、自己否定に陥りにくい。",
+    "さらに、周囲の価値観に合わせるだけでなく、自分が何を優先したいかを明確にすることが、納得の質を高める条件になる。",
+    "この視点に立てば、幸福は偶然の結果ではなく、選択と振り返りを繰り返す過程の中で育つ状態だと捉えられる。"
+  ];
+
+  let i = 0;
+  while (text.length < minLength && text.length < maxLength) {
+    const addition = extensionPool[i % extensionPool.length];
+    const prefix = /[。！？]$/.test(text) ? "" : "。";
+    const chunk = `${prefix}${addition}`;
+    const room = maxLength - text.length;
+    if (chunk.length <= room) {
+      text += chunk;
+    } else {
+      text += chunk.slice(0, room).replace(/[、,;:\s]+$/g, "");
+      if (!/[。！？]$/.test(text) && text.length < maxLength) text += "。";
+      break;
+    }
+    i += 1;
+  }
+
+  return text;
 }
 
 function gradeEssayMock(prompt, answer) {
