@@ -245,6 +245,7 @@ function gradeEssayMock(prompt, answer, opts = {}) {
   if (!answer) {
     return {
       totalScore: 0,
+      rewriteScore: 0,
       passed: false,
       categoryScores: emptyCategoryScores(),
       goodPoints: ["まずは解答を書いてみましょう。"],
@@ -278,33 +279,7 @@ function gradeEssayMock(prompt, answer, opts = {}) {
   if (reasonLevel >= 4 && hasCounter && hasCondition) reasonLevel = 5;
   if (!hasReason && hasClaim) reasonLevel = 1;
 
-  const categoryScores = {
-    questionFit: 8,
-    claimClarity: hasClaim ? 8 : 2,
-    reasonPersuasiveness: Math.min(25, reasonLevel * 5),
-    evidence: hasExample ? 11 : 4,
-    structure: sentenceCount >= 4 ? 11 : 6,
-    counterargument: hasCounter || hasCondition ? 3 : 0,
-    language: 8
-  };
-
-  if (abstractTheme) {
-    categoryScores.questionFit += hasDefinition ? 6 : 2;
-    categoryScores.questionFit += hasQuestionFraming ? 4 : 1;
-  } else {
-    categoryScores.questionFit += hasClaim && hasReason ? 10 : 3;
-  }
-
-  if (length < 200) {
-    categoryScores.structure -= 4;
-    categoryScores.evidence -= 3;
-  }
-
-  if (length > 650) {
-    categoryScores.language -= 2;
-  }
-
-  normalizeScores(categoryScores);
+  const categoryScores = scoreEssayCategories(prompt, answer);
 
   const isWhatQuestion = isDefinitionQuestion(prompt);
   const deductions = detectDeductions({
@@ -326,10 +301,12 @@ function gradeEssayMock(prompt, answer, opts = {}) {
   const suggestions = buildSuggestions(deductions);
   const rewriteExample = buildRewriteExample(prompt, answer);
 
-  let totalScore = Object.values(categoryScores).reduce((sum, n) => sum + n, 0);
+  let totalScore = sumCategoryScores(categoryScores);
   if (opts.useSpecialMatch) totalScore = 80;
+  const rewriteScore = calculateRewriteScore(prompt, rewriteExample, totalScore);
   return {
     totalScore,
+    rewriteScore,
     passed: totalScore >= rubricConfig.passLine,
     categoryScores,
     goodPoints,
@@ -346,6 +323,69 @@ function emptyCategoryScores() {
     acc[key] = 0;
     return acc;
   }, {});
+}
+
+function scoreEssayCategories(promptText, essayText) {
+  const answer = essayText || "";
+  const sentenceCount = (answer.match(/[。.!?！？]/g) || []).length || 1;
+  const length = answer.length;
+  const hasClaim = /(私は|私が|私は.*(考える|思う)|べきだ|必要だ|だと考える)/.test(answer);
+  const hasReason = /(なぜなら|理由は|からだ|ため|ので)/.test(answer);
+  const hasCauseEffect = /(ため|ので|結果|だからこそ|につながる)/.test(answer);
+  const hasExample = /(例えば|たとえば|具体的に|実際に|経験では|データ|統計|事例)/.test(answer);
+  const hasCounter = /(一方で|しかし|反論|とはいえ|ただし|もちろん)/.test(answer);
+  const hasCondition = /(場合|条件|なら|限り|によって)/.test(answer);
+  const hasDefinition = /(とは|定義|ここでいう|私の考える.*は)/.test(answer);
+  const hasQuestionFraming = /(問い|なぜ|どうすれば|何をもって)/.test(answer);
+  const abstractTheme = /幸せとは何か|自由とは何か|正義とは何か/.test(promptText || "");
+
+  let reasonLevel = 0;
+  if (hasReason) reasonLevel = 2;
+  if (hasReason && hasExample) reasonLevel = 3;
+  if (reasonLevel >= 3 && hasCauseEffect) reasonLevel = 4;
+  if (reasonLevel >= 4 && hasCounter && hasCondition) reasonLevel = 5;
+  if (!hasReason && hasClaim) reasonLevel = 1;
+
+  const categoryScores = {
+    questionFit: 8,
+    claimClarity: hasClaim ? 8 : 2,
+    reasonPersuasiveness: Math.min(25, reasonLevel * 5),
+    evidence: hasExample ? 11 : 4,
+    structure: sentenceCount >= 4 ? 11 : 6,
+    counterargument: hasCounter || hasCondition ? 3 : 0,
+    language: 8
+  };
+
+  if (abstractTheme) {
+    categoryScores.questionFit += hasDefinition ? 6 : 2;
+    categoryScores.questionFit += hasQuestionFraming ? 4 : 1;
+  } else {
+    categoryScores.questionFit += hasClaim && hasReason ? 10 : 3;
+  }
+
+  if (length < 200) {
+    categoryScores.structure -= 4;
+    categoryScores.evidence -= 3;
+  }
+  if (length > 650) {
+    categoryScores.language -= 2;
+  }
+
+  normalizeScores(categoryScores);
+  return categoryScores;
+}
+
+function sumCategoryScores(categoryScores) {
+  const values = Object.values(categoryScores || {});
+  return values.reduce((sum, n) => sum + (Number.isFinite(n) ? n : 0), 0);
+}
+
+function calculateRewriteScore(promptText, rewriteText, baseScore) {
+  const rewriteCategoryScores = scoreEssayCategories(promptText, rewriteText);
+  const rewriteTotal = sumCategoryScores(rewriteCategoryScores);
+  const safeBaseScore = Number.isFinite(baseScore) ? baseScore : 0;
+  const score = Math.max(safeBaseScore + 1, rewriteTotal);
+  return Math.min(100, score);
 }
 
 function normalizeScores(scores) {
@@ -521,6 +561,7 @@ function renderResult(result, comparison) {
 
     <article class="result-card">
       <h3>書き直し例</h3>
+      <p>書き直し想定スコア: <strong>${result.rewriteScore} / 100</strong></p>
       <p>${escapeHtml(result.rewriteExample)}</p>
     </article>
   `;
