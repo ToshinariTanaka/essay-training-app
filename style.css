@@ -93,7 +93,12 @@ body {
   margin: 16px 0;
 }
 
-.score-button {
+.model-action-area {
+  margin: 12px 0;
+}
+
+.score-button,
+.secondary-button {
   width: 100%;
   border: none;
   border-radius: 10px;
@@ -105,8 +110,17 @@ body {
   cursor: pointer;
 }
 
-.score-button:hover {
+.score-button:hover,
+.secondary-button:hover {
   background: var(--primary-dark);
+}
+
+.secondary-button {
+  background: #4f46e5;
+}
+
+.model-answer-area {
+  margin-top: 12px;
 }
 
 .result-grid {
@@ -132,6 +146,19 @@ body {
   padding-left: 18px;
 }
 
+.model-answer-card {
+  background: #f5f7ff;
+  border: 1px solid #c9d2ff;
+  border-radius: 10px;
+  padding: 14px;
+}
+
+.model-answer-meta {
+  margin: 6px 0;
+  font-size: 0.92rem;
+  color: var(--subtext);
+}
+
 .badge {
   display: inline-block;
   border-radius: 999px;
@@ -147,6 +174,10 @@ body {
 
 .badge.fail {
   background: var(--danger);
+}
+
+.badge.model {
+  background: #5b63f6;
 }
 
 .placeholder {
@@ -174,4 +205,24 @@ body {
   border: 0;
   clip: rect(0 0 0 0);
   overflow: hidden;
+}
+
+@media (max-width: 640px) {
+  .app-container {
+    padding: 12px;
+  }
+
+  .panel {
+    padding: 12px;
+  }
+
+  .score-button,
+  .secondary-button {
+    padding: 12px;
+    font-size: 0.95rem;
+  }
+
+  .result-grid {
+    grid-template-columns: 1fr;
+  }
 }
