@@ -21,7 +21,7 @@ const deductionsCatalog = [
   "具体例が弱い",
   "具体例だけで終わっている",
   "反論を無視している",
-  "条件設定がない",
+  "条件設定が弱い",
   "話が逸れている",
   "意味不明な表現がある",
   "不適切な外国語混入がある",
@@ -68,11 +68,11 @@ scoreButton.addEventListener("click", () => {
     renderModelAnswer(currentModelAnswer);
   }
 
-  const isExactModelMatch = isExactMatchModelAnswer(answerText, currentModelAnswer.text);
+  const isSimilarModelMatch = isExactMatchModelAnswer(answerText, currentModelAnswer.text);
   const result = gradeEssayMock(promptText, answerText, {
-    forceScore: isExactModelMatch ? 80 : null
+    useSpecialMatch: isSimilarModelMatch
   });
-  const comparison = compareWithModelAnswerMock(result, currentModelAnswer, { isExactModelMatch });
+  const comparison = compareWithModelAnswerMock(result, currentModelAnswer, { isSimilarModelMatch });
   renderResult(result, comparison);
 });
 
@@ -95,7 +95,7 @@ function generateModelAnswerMock(promptText) {
 }
 
 function compareWithModelAnswerMock(studentResult, modelAnswer, opts = {}) {
-  if (opts.isExactModelMatch) {
+  if (opts.isSimilarModelMatch) {
     return {
       benchmarkText: "AI模範解答と完全一致のため、特別判定を適用しています。",
       scoreDiff: 0,
@@ -183,7 +183,7 @@ function buildStructuredModelAnswer(promptText) {
     `【主張】${claim}`,
     "【理由1】快楽は短期的に強くても持続しにくく、納得を伴う選択は自己評価を安定させるからだ。例えば、試験前に遊びを減らして勉強を優先すると、その日の満足は減っても「目的に沿って動けた」という感覚が残り、翌日も行動を続けやすくなる。",
     "【理由2】納得できる選択は、失敗したときの修正可能性を高めるからだ。例えば、目標と手段を言語化して学習計画を立てた人は、点数が下がっても原因を特定し、次回の対策を具体化できるため、挫折しにくい。",
-    "【理由3】他者比較だけに依存しない基準を持てるからだ。例えば、同じ順位でも「自分の優先順位に沿って努力した」と判断できれば、周囲の評価に振り回されず、心理的な安定を保ちやすい。",
+    "【理由3】納得を軸にすると、他者と協力する姿勢を保ちやすいからだ。例えば、成果を独占せず『自分の目的に照らして十分か』で判断できれば、比較による焦りが減り、周囲と役割分担しながら継続的に成果を伸ばしやすい。",
     "【反論と再反論】一方で、結果が出なければ幸福とは言えないという反論がある。確かに結果は重要だが、結果のみで幸福を測ると達成後も不安が残る。むしろ、結果評価に加えて選択への納得を基準に含める方が、長期的で再現可能な幸福につながる。",
     `【結論】${claim}`
   ];
@@ -194,8 +194,12 @@ function buildStructuredModelAnswer(promptText) {
 function enforceConclusionEnding(text, claim) {
   const trimmed = (text || "").trim();
   if (!trimmed) return `【主張】${claim}\n【結論】${claim}`;
-  if (trimmed.endsWith(`【結論】${claim}`)) return trimmed;
-  return `${trimmed}\n【結論】${claim}`;
+  const linesWithoutConclusion = trimmed
+    .split("\n")
+    .map((line) => line.trim())
+    .filter((line) => line && !line.startsWith("【結論】"));
+  linesWithoutConclusion.push(`【結論】${claim}`);
+  return linesWithoutConclusion.join("\n");
 }
 
 function fitTextWithinRange(baseText, minLength, maxLength) {
@@ -215,9 +219,12 @@ function fitTextWithinRange(baseText, minLength, maxLength) {
     "この視点に立てば、幸福は偶然の結果ではなく、選択と振り返りを繰り返す過程の中で育つ状態だと捉えられる。"
   ];
 
+  const usedAdditions = new Set();
   let i = 0;
   while (text.length < minLength && text.length < maxLength) {
     const addition = extensionPool[i % extensionPool.length];
+    if (usedAdditions.has(addition)) break;
+    usedAdditions.add(addition);
     const prefix = /[。！？]$/.test(text) ? "" : "。";
     const chunk = `${prefix}${addition}`;
     const room = maxLength - text.length;
@@ -320,7 +327,7 @@ function gradeEssayMock(prompt, answer, opts = {}) {
   const rewriteExample = buildRewriteExample(prompt, answer);
 
   let totalScore = Object.values(categoryScores).reduce((sum, n) => sum + n, 0);
-  if (opts.forceScore === 80) totalScore = 80;
+  if (opts.useSpecialMatch) totalScore = 80;
   return {
     totalScore,
     passed: totalScore >= rubricConfig.passLine,
@@ -358,7 +365,7 @@ function detectDeductions(ctx) {
   if (!ctx.hasExample) list.push("具体例が弱い");
   if (ctx.hasExample && !ctx.hasReason) list.push("具体例だけで終わっている");
   if (!ctx.hasCounter) list.push("反論を無視している");
-  if (!ctx.hasCondition) list.push("条件設定がない");
+  if (!ctx.hasCondition) list.push("条件設定が弱い");
   if (/ところで|ちなみに/.test(ctx.answer)) list.push("話が逸れている");
   if (/[\^]{2,}|@@@/.test(ctx.answer)) list.push("意味不明な表現がある");
   if (/\b(?:very|awesome|cool)\b/i.test(ctx.lowerAnswer)) list.push("不適切な外国語混入がある");
@@ -415,7 +422,7 @@ function buildSuggestions(deductions) {
     "具体例が弱い": "学校生活・社会事例・ニュースなどの具体的場面を1つ入れる。",
     "具体例だけで終わっている": "例の後に『この例から〜と言える』と結論へ戻す。",
     "反論を無視している": "『一方で〜という反論がある』を入れたうえで再反論する。",
-    "条件設定がない": "『ただし〜の場合に限る』の形で適用条件を示す。"
+    "条件設定が弱い": "『ただし〜の場合に限る』の形で適用条件を示す。"
   };
 
   const suggestions = deductions
@@ -439,7 +446,7 @@ function buildRewriteExample(promptText, answer) {
     `【主張】${claim}`,
     "【理由1】納得して選んだ行動は、短期的な苦痛があっても継続しやすい。例えば、目標を明確にして毎日30分だけ復習すると、勉強時間は短くても理解の抜けを減らせる。",
     "【理由2】納得のある選択は、失敗後の修正を可能にする。例えば、計画の根拠を記録しておけば、テスト結果が悪くても方法を調整でき、自己否定に流れにくい。",
-    "【理由3】他者評価だけに依存しないため、成果が遅れても心理的安定を維持できる。例えば、順位が同じでも『自分の優先順位に沿って行動したか』で振り返れば、次の一歩を具体化できる。",
+    "【理由3】納得を軸に判断すると、周囲との協力を維持しやすい。例えば、結果を独占せず『目的に沿って役割を果たせたか』で振り返れば、比較の焦りを抑えつつ次の改善を共有できる。",
     "【反論と再反論】もちろん、結果が出なければ意味がないという反論は成り立つ。しかし、結果だけを基準にすると達成後も不安が残る。結果評価に加えて選択への納得を基準に含める方が、長期的には成果と幸福の両立につながる。",
     `【結論】${claim}`
   ];
