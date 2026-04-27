@@ -2,10 +2,54 @@
 <html lang="ja">
 <head>
   <meta charset="UTF-8">
-  <title>小論文トレーニングアプリ</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>大学入試小論文トレーニングアプリ MVP</title>
+  <link rel="stylesheet" href="style.css">
 </head>
 <body>
-  <h1>小論文トレーニングアプリ</h1>
-  <p>ここにアプリを作っていきます。</p>
+  <main class="app-container">
+    <header class="app-header">
+      <h1>大学入試小論文トレーニングアプリ</h1>
+      <p>理由の説得力を鍛えるためのMVP版</p>
+    </header>
+
+    <section class="panel problem-panel" aria-labelledby="problem-title">
+      <div class="panel-heading">
+        <h2 id="problem-title">1. 問題文エリア</h2>
+      </div>
+      <label for="promptInput" class="visually-hidden">問題文</label>
+      <textarea id="promptInput" class="large-textarea" rows="8">【問題】
+次の問いについて、あなたの意見を600字以内で述べなさい。
+「幸せとは何か」。
+
+あなた自身の定義を示し、その定義に基づいて具体的な理由と例を挙げて論じなさい。想定される反論にも触れ、条件によって結論が変わる場合はその条件も示すこと。</textarea>
+      <p class="hint">抽象テーマでは「問いの立て方」と「抽象語の定義」も評価されます。</p>
+    </section>
+
+    <section class="panel answer-panel" aria-labelledby="answer-title">
+      <div class="panel-heading">
+        <h2 id="answer-title">2. 解答エリア</h2>
+        <p id="charCount" class="char-count">文字数: 0</p>
+      </div>
+      <label for="answerInput" class="visually-hidden">解答</label>
+      <textarea id="answerInput" class="large-textarea" rows="12" placeholder="ここに小論文解答を書いてください（目安: 400〜600字）"></textarea>
+      <p class="hint">主張 → 理由（因果）→ 具体例 → 反論への対応 の順で書くと説得力が上がります。</p>
+    </section>
+
+    <div class="action-area">
+      <button id="scoreButton" class="score-button" type="button">3. 採点する（100点満点）</button>
+    </div>
+
+    <section class="panel result-panel" aria-labelledby="result-title">
+      <div class="panel-heading">
+        <h2 id="result-title">4. 採点結果エリア</h2>
+      </div>
+      <div id="resultArea" class="result-grid">
+        <p class="placeholder">解答を入力して「採点する」を押すと結果が表示されます。</p>
+      </div>
+    </section>
+  </main>
+
+  <script src="script.js"></script>
 </body>
 </html>

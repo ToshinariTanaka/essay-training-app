@@ -1,0 +1,177 @@
+:root {
+  color-scheme: light;
+  --bg: #f6f8fc;
+  --panel-bg: #ffffff;
+  --text: #1f2a44;
+  --subtext: #506080;
+  --primary: #2f67ff;
+  --primary-dark: #1f4fd3;
+  --border: #dce3f2;
+  --success: #1f9d63;
+  --danger: #c92a2a;
+  --warning: #e67700;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: "Hiragino Kaku Gothic ProN", "Yu Gothic", "Noto Sans JP", sans-serif;
+  color: var(--text);
+  background: var(--bg);
+  line-height: 1.6;
+}
+
+.app-container {
+  max-width: 960px;
+  margin: 0 auto;
+  padding: 20px;
+}
+
+.app-header {
+  text-align: center;
+  margin-bottom: 16px;
+}
+
+.app-header h1 {
+  margin: 0;
+  font-size: 1.8rem;
+}
+
+.app-header p {
+  margin: 6px 0 0;
+  color: var(--subtext);
+}
+
+.panel {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: 12px;
+  padding: 16px;
+  margin-bottom: 14px;
+  box-shadow: 0 4px 10px rgba(24, 48, 110, 0.05);
+}
+
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 10px;
+  margin-bottom: 10px;
+}
+
+.panel h2 {
+  margin: 0;
+  font-size: 1.15rem;
+}
+
+.large-textarea {
+  width: 100%;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 1rem;
+  resize: vertical;
+  min-height: 180px;
+}
+
+.large-textarea:focus {
+  border-color: var(--primary);
+  outline: 2px solid rgba(47, 103, 255, 0.2);
+}
+
+.char-count,
+.hint {
+  margin: 8px 0 0;
+  color: var(--subtext);
+  font-size: 0.9rem;
+}
+
+.action-area {
+  margin: 16px 0;
+}
+
+.score-button {
+  width: 100%;
+  border: none;
+  border-radius: 10px;
+  padding: 14px;
+  font-size: 1rem;
+  font-weight: 700;
+  color: #fff;
+  background: var(--primary);
+  cursor: pointer;
+}
+
+.score-button:hover {
+  background: var(--primary-dark);
+}
+
+.result-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(230px, 1fr));
+  gap: 12px;
+}
+
+.result-card {
+  background: #f8faff;
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.result-card h3 {
+  margin: 0 0 6px;
+  font-size: 1rem;
+}
+
+.result-card ul {
+  margin: 0;
+  padding-left: 18px;
+}
+
+.badge {
+  display: inline-block;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font-size: 0.85rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.badge.pass {
+  background: var(--success);
+}
+
+.badge.fail {
+  background: var(--danger);
+}
+
+.placeholder {
+  margin: 0;
+  color: var(--subtext);
+}
+
+.score-large {
+  font-size: 2rem;
+  font-weight: 800;
+  margin: 0;
+}
+
+.warning-text {
+  color: var(--warning);
+  margin-top: 8px;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  border: 0;
+  clip: rect(0 0 0 0);
+  overflow: hidden;
+}
