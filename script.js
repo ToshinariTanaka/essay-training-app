@@ -223,8 +223,27 @@ function fitTextWithinRange(baseText, minLength, maxLength) {
   if (needed <= 0) return trimmed;
   const suffix = (/[。！？]$/.test(trimmed) ? "" : "。") + filler;
   const appended = `${trimmed}${suffix}`;
-  return trimToMaxWithoutCut(appended, maxLength);
-  
+
+  let expanded = appended;
+  while (expanded.length < minLength) {
+    const remain = minLength - expanded.length;
+    if (remain <= 0) break;
+    const chunk = filler.slice(0, Math.min(filler.length, remain));
+    expanded += chunk;
+    if (chunk.length === 0) break;
+  }
+
+  if (expanded.length > maxLength) {
+    const clipped = expanded.slice(0, maxLength).replace(/[、,;:\s]+$/g, "");
+    expanded = /[。！？]$/.test(clipped) ? clipped : `${clipped}。`;
+    if (expanded.length > maxLength) {
+      expanded = expanded.slice(0, maxLength).replace(/[、,;:\s]+$/g, "");
+    }
+  }
+
+  return expanded;
+}
+
 function gradeEssayMock(prompt, answer, opts = {}) {
   if (!answer) {
     return {
