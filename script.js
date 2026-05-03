@@ -223,9 +223,8 @@ function fitTextWithinRange(baseText, minLength, maxLength) {
   if (needed <= 0) return trimmed;
   const suffix = (/[。！？]$/.test(trimmed) ? "" : "。") + filler;
   const appended = `${trimmed}${suffix}`;
-  return appended.slice(0, Math.min(maxLength, trimmed.length + needed + suffix.length)).replace(/[、,;:\s]+$/g, "");
-}
-
+  return trimToMaxWithoutCut(appended, maxLength);
+  
 function gradeEssayMock(prompt, answer, opts = {}) {
   if (!answer) {
     return {
