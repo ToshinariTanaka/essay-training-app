@@ -182,7 +182,7 @@ function buildStructuredModelAnswer(promptText) {
   const sections = [
     `【主張】${claim}`,
     "【理由1：合理的理由】納得を伴う選択は判断基準が明確になるため、失敗後も原因を特定して次の行動を修正しやすい。例えば、試験前に学習計画の根拠を言語化しておけば、点数が下がっても改善点を具体化できる。",
-    "【理由2：伝統的理由】納得できる選択は、努力と継続を重んじるという社会で共有されてきた価値観と整合し、日々の行動を安定させる。例えば、短期的な快楽より目標達成を優先する姿勢は、学校生活でも長く評価されてきた。",
+    "【理由2：伝統的理由】納得できる選択は、努力と継続を重んじる社会的価値観と整合し、実践可能性も高い。",
     "【理由3：権威的理由】心理学や教育実践でも、自律的に選んだ行動は動機づけを保ちやすいとされ、自己効力感を高めると報告されている。例えば、自分で選んだ学習課題を継続した生徒ほど、達成後の満足と再挑戦意欲が高まりやすい。",
     "【反論と再反論】一方で、結果が出なければ幸福とは言えないという反論がある。確かに結果は重要だが、結果のみで幸福を測ると達成後も不安が残る。むしろ、結果評価に加えて選択への納得を基準に含める方が、長期的で再現可能な幸福につながる。",
     `【結論】${claim}`
@@ -206,42 +206,24 @@ function enforceConclusionEnding(text, claim) {
 }
 
 function fitTextWithinRange(baseText, minLength, maxLength) {
-  let text = (baseText || "").trim();
-  if (!text) return text;
+  const trimmed = (baseText || "").trim();
+  if (!trimmed) return "";
 
-  if (text.length > maxLength) {
-    text = text.slice(0, maxLength).replace(/[、,;:\s]+$/g, "");
-    if (!/[。！？]$/.test(text)) text += "。";
-    return text;
+  if (trimmed.length >= minLength && trimmed.length <= maxLength) {
+    return trimmed;
   }
 
-  const extensionPool = [
-    "また、幸福は感情の高まりだけで決まるのではなく、自分の選択に理由を与えられるかどうかで安定性が変わる。",
-    "たとえ短期的な失敗があっても、選択の根拠を言語化できる人は次の行動を修正しやすく、自己否定に陥りにくい。",
-    "さらに、周囲の価値観に合わせるだけでなく、自分が何を優先したいかを明確にすることが、納得の質を高める条件になる。",
-    "この視点に立てば、幸福は偶然の結果ではなく、選択と振り返りを繰り返す過程の中で育つ状態だと捉えられる。"
-  ];
-
-  const usedAdditions = new Set();
-  let i = 0;
-  while (text.length < minLength && text.length < maxLength) {
-    const addition = extensionPool[i % extensionPool.length];
-    if (usedAdditions.has(addition)) break;
-    usedAdditions.add(addition);
-    const prefix = /[。！？]$/.test(text) ? "" : "。";
-    const chunk = `${prefix}${addition}`;
-    const room = maxLength - text.length;
-    if (chunk.length <= room) {
-      text += chunk;
-    } else {
-      text += chunk.slice(0, room).replace(/[、,;:\s]+$/g, "");
-      if (!/[。！？]$/.test(text) && text.length < maxLength) text += "。";
-      break;
-    }
-    i += 1;
+  if (trimmed.length > maxLength) {
+    const clipped = trimmed.slice(0, maxLength).replace(/[、,;:\s]+$/g, "");
+    return /[。！？]$/.test(clipped) ? clipped : `${clipped}。`;
   }
 
-  return text;
+  const filler = "また、この考え方は日常の意思決定に直結し、実践可能性も高い。";
+  const needed = Math.min(maxLength - trimmed.length, Math.max(0, minLength - trimmed.length));
+  if (needed <= 0) return trimmed;
+  const suffix = (/[。！？]$/.test(trimmed) ? "" : "。") + filler;
+  const appended = `${trimmed}${suffix}`;
+  return appended.slice(0, Math.min(maxLength, trimmed.length + needed + suffix.length)).replace(/[、,;:\s]+$/g, "");
 }
 
 function gradeEssayMock(prompt, answer, opts = {}) {
